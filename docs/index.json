@@ -8,7 +8,7 @@
       "id": "name_first",
       "name": "Name First",
       "tagline": "Name every object the moment you add it, like a variable",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "type": "add-on",
       "maintainer": "Bayrem",
       "license": [
@@ -23,9 +23,9 @@
         "Object",
         "User Interface"
       ],
-      "archive_url": "./name_first-1.1.0.zip",
-      "archive_size": 3326,
-      "archive_hash": "sha256:27ae0c6b268237a04ba68b6a5b8f93352ecb675aa3de41fe89699a9e3482a2aa"
+      "archive_url": "./name_first-1.2.0.zip",
+      "archive_size": 7031,
+      "archive_hash": "sha256:31b1dd96db6931b4e2a0ba2f75d78ea8d8172d1fa38948bf823aed899ef2fe48"
     }
   ]
 }

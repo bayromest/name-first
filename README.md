@@ -38,21 +38,33 @@ lights, cameras, empties, armatures, grease pencil, force fields, and primitives
 add-ons. It stays quiet for things that aren't new objects (adding a modifier, a material
 slot, a primitive inside Edit Mode) and for scripts.
 
-### Optional: pick the collection too
+### Optional: pick the collection, or make a new one
 
 Forgot which collection was active? Turn on **Also ask for the collection** in the
-extension's preferences (*Edit → Preferences → Add-ons → Name First*). The popup then shows
-a collection list right under the name, starting on the one the object landed in. Type the
-name, press <kbd>Enter</kbd>, pick a collection, move the mouse away.
+extension's preferences (*Edit → Preferences → Add-ons → Name First*). The popup then gets
+two more lines:
 
-<img src="assets/preview-collection.png" width="460" alt="The popup with the name Chair and the collection Furniture picked, the Add Cube panel still open below">
+- **The collection list**, starting on the one the object landed in. Pick another and the
+  object moves there.
+- **New collection**. Press <kbd>Tab</kbd> from the name to jump to it, type a name, press
+  <kbd>Enter</kbd>: the collection exists and the object is in it. It goes inside the
+  collection shown in the list, at the bottom, like Blender's own *New Collection*.
+
+  Then, only if you want: click a **color**, pick the collection it goes **inside**, and
+  **where** it goes, after any collection or object, since Blender 5.3 lets the Outliner mix
+  them in any order. Every change shows in the Outliner right away. **×** undoes it all.
+
+So the whole thing can be keyboard only: <kbd>Shift</kbd> <kbd>A</kbd> → `Chair`
+<kbd>Tab</kbd> `Furniture` <kbd>Enter</kbd>.
+
+<img src="assets/preview-collection.png" width="600" alt="The popup with the name Vase, a new red collection Decor placed after Lights, and the Outliner showing Decor right after Lights">
 
 ### The "Adjust Last Operation" panel keeps working
 
 Renaming with Blender's own <kbd>F2</kbd> closes the *Adjust Last Operation* panel, so you
 can no longer change the cylinder's vertices or the cube's size. `name-first` doesn't: the
 panel stays open, and if you change the vertices afterwards, the object keeps the name you
-typed (and the collection you picked).
+typed (and the collection you picked or made).
 
 You might think of pressing <kbd>F9</kbd> to bring the panel back after <kbd>F2</kbd>: it
 doesn't work, because renaming with <kbd>F2</kbd> makes Blender forget the last operation
@@ -82,7 +94,7 @@ repository, so you still get updates.
 
 ### Offline
 
-Download **`name_first-1.1.0.zip`** from the [latest release](../../releases/latest) and drag
+Download **`name_first-1.2.0.zip`** from the [latest release](../../releases/latest) and drag
 it into Blender (or *Get Extensions → ⌄ → Install from Disk*). You won't get updates this way.
 
 **To turn it off:** disable or uninstall the extension.
@@ -96,8 +108,10 @@ The whole extension is [one small file](extension/name_first/__init__.py):
 | Notice a new object | After each update, the last operator is an `…_add` and the object count went up |
 | Ask for its name | Opens a popup panel, the same one <kbd>F2</kbd> shows, under the mouse |
 | Rename without closing *Adjust Last Operation* | The text field lives on the window manager, which isn't part of undo, so typing in it doesn't end the operation the way <kbd>F2</kbd> does |
-| Move it to a collection | Same trick: the list lives on the window manager, the object is moved from code |
-| Keep the name after a redo | Changing the vertices re-creates the object as `Cylinder`; it gets your name and collection back |
+| Move it, or make a collection | Same trick: the list and the new-collection fields live on the window manager, and the work is done from code |
+| Keep undo safe | Every change is saved as its own undo step, which Blender allows without closing *Adjust Last Operation* |
+| Place a collection anywhere | Blender 5.3's Outliner order (`sort_index`), shared by collections and objects; older versions only reorder collections |
+| Keep everything after a redo | Changing the vertices re-creates the object as `Cylinder`; it gets its name back, and its collection (made again if needed) |
 
 Nothing runs in the background and no keymaps change.
 
@@ -109,7 +123,7 @@ Yes, nothing about <kbd>F2</kbd> changes.
 **Does it ask when I duplicate (<kbd>Shift</kbd> <kbd>D</kbd>) or import a file?**
 No, only for the *Add* menu. A duplicate is usually "the same thing again".
 
-**Can it also ask which collection the object goes in?**
+**Can it also ask which collection the object goes in, or make a new one?**
 Yes, turn on *Also ask for the collection* in the preferences. It's off by default, so the
 popup stays a one-field, <kbd>Enter</kbd>-and-done thing.
 

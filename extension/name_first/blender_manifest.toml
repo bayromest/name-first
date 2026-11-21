@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "name_first"
-version = "1.1.0"
+version = "1.2.0"
 name = "Name First"
 tagline = "Name every object the moment you add it, like a variable"
 maintainer = "Bayrem"
