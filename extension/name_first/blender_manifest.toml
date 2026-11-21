@@ -1,0 +1,17 @@
+schema_version = "1.0.0"
+
+id = "name_first"
+version = "1.0.0"
+name = "Name First"
+tagline = "Name every object the moment you add it, like a variable"
+maintainer = "Bayrem"
+type = "add-on"
+
+website = "https://github.com/bayromest/name-first"
+
+tags = ["Object", "User Interface"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 Bayrem"]

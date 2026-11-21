@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question
+    url: https://github.com/bayromest/name-first/discussions/categories/q-a
+    about: Ask in Discussions.
+  - name: Idea
+    url: https://github.com/bayromest/name-first/discussions/categories/ideas
+    about: Share it in Discussions.

@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "blocklist": [],
+  "assetlib_auth_method": "PER_LIBRARY",
+  "data": [
+    {
+      "schema_version": "1.0.0",
+      "id": "name_first",
+      "name": "Name First",
+      "tagline": "Name every object the moment you add it, like a variable",
+      "version": "1.0.0",
+      "type": "add-on",
+      "maintainer": "Bayrem",
+      "license": [
+        "SPDX:GPL-3.0-or-later"
+      ],
+      "blender_version_min": "4.2.0",
+      "website": "https://github.com/bayromest/name-first",
+      "copyright": [
+        "2026 Bayrem"
+      ],
+      "tags": [
+        "Object",
+        "User Interface"
+      ],
+      "archive_url": "./name_first-1.0.0.zip",
+      "archive_size": 2443,
+      "archive_hash": "sha256:1c695b5c89eb61ac03d2e904938ce0c4d3a6575d33bb00cebc0bacc15d5ae118"
+    }
+  ]
+}

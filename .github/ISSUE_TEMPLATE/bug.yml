@@ -1,0 +1,20 @@
+name: Bug
+description: Something doesn't work
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: What you added, what you expected, what you got. Screenshots help.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Blender version
+      placeholder: 5.3.0
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Operating system
+      placeholder: Windows 11
