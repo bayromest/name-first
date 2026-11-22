@@ -28,6 +28,7 @@ state = {
     "before": "",     # where the object was before a new collection was made
     "new": None,      # the collection made in the popup: name, color, parent, after
     "objects": 0,     # object count at the previous update
+    "active": "",     # the Outliner's active collection when the object was added
 }
 quiet = []  # non-empty while the popup's fields are filled in from code
 enum_items = {}  # Blender needs Python to keep dynamic enum items alive
@@ -98,47 +99,88 @@ def cancel_new(context):
     save_undo_step("Remove New Collection")
 
 
-def change_parent(wm, context):
-    if quiet:
+def new_collection():
+    return bpy.data.collections.get(state["new"]["name"]) if state["new"] else None
+
+
+def remember(scene, created):
+    """Note where the new collection is, to make it again after a redo."""
+    parent, after = ct.where(scene, created)
+    state["collection"] = created.name
+    state["new"] = {"name": created.name, "color": created.color_tag,
+                    "parent": ct.id_of(scene, parent), "after": after}
+    # The small Outliner shows the new collection as the selected row.
+    set_quietly(bpy.context.window_manager, name_first_place=created.name)
+
+
+# The small Outliner's rows, arrows and × are properties too, not operator
+# buttons: an operator run from the popup closes "Adjust Last Operation".
+
+def place_clicked(wm, context):
+    """A row was clicked: put the new collection inside that one."""
+    created = new_collection()
+    if quiet or created is None or tracked_object(context) is None:
         return
-    parent = ct.from_id(context.scene, wm.name_first_parent)
-    skip = state["new"]["name"] if state["new"] else None
-    set_quietly(wm, name_first_after=ct.last_position(parent, skip))
-    apply_new(wm, context)
+    if wm.name_first_place != created.name:
+        ct.move(context.scene, created, 'INTO', wm.name_first_place)
+        save_undo_step("Move Collection")
+    remember(context.scene, created)
+
+
+def step_clicked(wm, context):
+    """An arrow was clicked: move the new collection one step."""
+    created = new_collection()
+    if quiet or wm.name_first_step == 'NONE':
+        return
+    if created is not None and tracked_object(context) is not None:
+        ct.move(context.scene, created, wm.name_first_step)
+        remember(context.scene, created)
+        save_undo_step("Move Collection")
+    set_quietly(wm, name_first_step='NONE')
+
+
+def cancel_clicked(wm, context):
+    if quiet or not wm.name_first_cancel:
+        return
+    set_quietly(wm, name_first_cancel=False)
+    cancel_new(context)
+
+
+def place_enum(wm, context):
+    created = state["new"]["name"] if state["new"] else None
+    enum_items["place"] = [
+        (identifier, label.strip(),
+         "The new collection" if identifier == created else "Put it inside this collection",
+         icon, value)
+        for identifier, label, _, icon, value in ct.tree_items(context.scene)]
+    return enum_items["place"]
 
 
 def apply_new(wm, context):
     """Create the collection once it has a name; after that, every change to
-    its name, color, parent or place applies right away."""
+    its name or color applies right away."""
     obj = tracked_object(context)
     if quiet or obj is None:
         return
     scene = context.scene
     name = wm.name_first_new_name.strip()
-    parent = ct.from_id(scene, wm.name_first_parent) or scene.collection
-    created = bpy.data.collections.get(state["new"]["name"]) if state["new"] else None
+    created = new_collection()
     if created is None:
         if not name:
             return
-        # New collections go inside the one shown in the list, at the end,
+        # New collections go inside the one shown in the list, at the bottom,
         # like Blender's own "New Collection".
         state["before"] = wm.name_first_collection
         parent = ct.from_id(scene, wm.name_first_collection) or scene.collection
         created = ct.create(scene, name, wm.name_first_color, parent, ct.FIRST)
-        state["new"] = {"name": created.name}  # the lists below leave it out
         ct.move_object(obj, created)  # first, so it isn't counted among the siblings
-        set_quietly(wm, name_first_parent=ct.id_of(scene, parent))
-        set_quietly(wm, name_first_after=ct.last_position(parent, skip=created.name))
-        ct.place(scene, created, parent, wm.name_first_after)
+        ct.place(scene, created, parent, ct.last_position(parent, skip=created.name))
     else:
         if name and name != created.name:
             created.name = name
         created.color_tag = wm.name_first_color
-        ct.place(scene, created, parent, wm.name_first_after)
     ct.move_object(obj, created)
-    state["collection"] = created.name
-    state["new"] = {"name": created.name, "color": created.color_tag,
-                    "parent": wm.name_first_parent, "after": wm.name_first_after}
+    remember(scene, created)
     if created.name != wm.name_first_new_name:
         set_quietly(wm, name_first_new_name=created.name)  # e.g. "Props.001"
     save_undo_step("New Collection")
@@ -147,19 +189,6 @@ def apply_new(wm, context):
 def collection_enum(wm, context):
     enum_items["collection"] = ct.tree_items(context.scene)
     return enum_items["collection"]
-
-
-def parent_enum(wm, context):
-    skip = state["new"]["name"] if state["new"] else None
-    enum_items["parent"] = ct.tree_items(context.scene, skip=skip)
-    return enum_items["parent"]
-
-
-def after_enum(wm, context):
-    parent = ct.from_id(context.scene, wm.name_first_parent) or context.scene.collection
-    skip = state["new"]["name"] if state["new"] else None
-    enum_items["after"] = ct.position_items(parent, skip=skip)
-    return enum_items["after"]
 
 
 COLOR_ITEMS = [(c, c.replace("_", " ").title(), "", 'COLLECTION_' + c if c != 'NONE' else 'OUTLINER_COLLECTION', i)
@@ -187,15 +216,13 @@ class NAMEFIRST_AddonPreferences(bpy.types.AddonPreferences):
         self.layout.prop(self, "ask_collection")
 
 
-class NAMEFIRST_OT_cancel_collection(bpy.types.Operator):
-    """Remove the new collection and put the object back"""
-    bl_idname = "name_first.cancel_collection"
-    bl_label = "Cancel New Collection"
-    bl_options = {'INTERNAL'}
-
-    def execute(self, context):
-        cancel_new(context)
-        return {'FINISHED'}
+STEPS = [
+    ('NONE', "", ""),
+    ('UP', "Up", "Move it up"),
+    ('DOWN', "Down", "Move it down"),
+    ('OUT', "Out", "Move it out of the collection it's in"),
+    ('IN', "In", "Move it into the collection above it"),
+]
 
 
 def text_field(layout, wm, prop, placeholder):
@@ -236,17 +263,54 @@ class NAMEFIRST_PT_name(bpy.types.Panel):
         if not created:
             return
 
-        # Once it exists: color, parent and place apply right away.
+        # Once it exists: its color, and a small Outliner to put it anywhere.
         row = layout.row()
         row.label(icon='BLANK1')
         row.prop(wm, "name_first_color", expand=True, icon_only=True)
-        row.operator(NAMEFIRST_OT_cancel_collection.bl_idname, text="", icon='X', emboss=False)
+        row.prop(wm, "name_first_cancel", text="", icon='X', emboss=False)
+        created = new_collection()
+        if created is not None:
+            draw_outliner(layout.box().column(align=True), context, created)
 
-        row = layout.row()
-        row.label(icon='BLANK1')
-        sub = row.row(align=True)
-        sub.prop(wm, "name_first_parent", text="")
-        sub.prop(wm, "name_first_after", text="")
+
+def draw_outliner(col, context, created):
+    """Every collection, indented like the Outliner. Click one to put the new
+    collection inside it; the arrows on the new one move it a step."""
+    scene, wm = context.scene, context.window_manager
+
+    def into(target, text, icon, depth):
+        row = col.row(align=True)
+        if target != created.name:
+            row.emboss = 'NONE'  # plain rows; the new collection looks selected
+        left = row.row(align=True)
+        left.alignment = 'LEFT'
+        for _ in range(depth):
+            left.label(icon='BLANK1')
+        left.prop_enum(wm, "name_first_place", target, text=text, icon=icon)
+        return row
+
+    into(ct.SCENE_COLLECTION, "Scene Collection", 'SCENE_DATA', 0)
+    possible = ct.moves(scene, created)
+    obj = tracked_object(context)
+    for collection, depth in ct.tree(scene):
+        row = into(collection.name, collection.name, ct.icon(collection), depth + 1)
+        if collection != created:
+            continue
+        arrows = row.row(align=True)
+        arrows.alignment = 'RIGHT'
+        arrows.emboss = 'NORMAL'
+        for action, icon_name in (('UP', 'TRIA_UP'), ('DOWN', 'TRIA_DOWN'),
+                                  ('OUT', 'TRIA_LEFT'), ('IN', 'TRIA_RIGHT')):
+            button = arrows.row(align=True)
+            button.enabled = possible[action]
+            button.prop_enum(wm, "name_first_step", action, text="", icon=icon_name)
+        if obj is not None:
+            row = col.row(align=True)
+            row.alignment = 'LEFT'
+            row.active = False
+            for _ in range(depth + 2):
+                row.label(icon='BLANK1')
+            row.label(text=obj.name, icon='OBJECT_DATA')
 
 
 def window_override():
@@ -260,15 +324,27 @@ def window_override():
     return override
 
 
+def start_collection(context):
+    """The collection the list starts on: the active one in the Outliner. The
+    object goes there if Blender put it somewhere else."""
+    scene, layer = context.scene, context.view_layer.active_layer_collection
+    obj = tracked_object(context)
+    usable = not (layer.exclude or layer.collection.library or layer.collection.override_library)
+    if obj is not None and usable and layer.collection not in obj.users_collection:
+        ct.move_object(obj, layer.collection)
+        save_undo_step("Move to Collection")
+    if obj is not None and layer.collection not in obj.users_collection and obj.users_collection:
+        return ct.id_of(scene, obj.users_collection[0])
+    return ct.id_of(scene, layer.collection)
+
+
 def open_rename_popup():
     wm = bpy.context.window_manager
     wm.name_first = state["name"]
     keep_open = ask_collection()
     if keep_open:
-        obj = bpy.context.view_layer.objects.active
-        current = obj.users_collection[0] if obj and obj.users_collection else None
         set_quietly(wm, name_first_new_name="", name_first_color='NONE',
-                    name_first_collection=ct.id_of(bpy.context.scene, current))
+                    name_first_collection=start_collection(bpy.context))
     with bpy.context.temp_override(**window_override()):
         # With more than one field, Enter on the name mustn't close the popup.
         bpy.ops.wm.call_panel(name=NAMEFIRST_PT_name.__name__, keep_open=keep_open)
@@ -299,6 +375,8 @@ def restore_name():
         new["name"] = state["collection"] = created.name
     if state["collection"]:
         ct.move_object(obj, ct.from_id(scene, state["collection"]))
+    # Redoing can also leave another collection active in the Outliner.
+    ct.set_active(bpy.context.view_layer, ct.from_id(scene, state["active"]))
     save_undo_step("Name Object")
 
 
@@ -327,19 +405,19 @@ def on_update(scene, depsgraph):
     elif op.bl_idname.endswith("_add") and state["objects"] > previous and obj.select_get():
         # A new object, not a modifier or material slot added to an existing one.
         state.update(op=op.as_pointer(), uid=obj.session_uid, default=obj.name, name=obj.name,
-                     collection="", before="", new=None)
+                     collection="", before="", new=None,
+                     active=ct.id_of(scene, bpy.context.view_layer.active_layer_collection.collection))
         run_soon(open_rename_popup)
 
 
 @persistent
 def on_load(_):
-    state.update(op=0, uid=0, default="", name="", collection="", before="", new=None,
+    state.update(op=0, uid=0, default="", name="", collection="", before="", new=None, active="",
                  objects=object_count())
 
 
 classes = (
     NAMEFIRST_AddonPreferences,
-    NAMEFIRST_OT_cancel_collection,
     NAMEFIRST_PT_name,
 )
 
@@ -352,10 +430,12 @@ PROPS = {
         update=apply_new),
     "name_first_color": lambda: bpy.props.EnumProperty(
         name="Color", items=COLOR_ITEMS, default='NONE', update=apply_new),
-    "name_first_parent": lambda: bpy.props.EnumProperty(
-        name="Inside", description="The collection it goes in", items=parent_enum, update=change_parent),
-    "name_first_after": lambda: bpy.props.EnumProperty(
-        name="Place", description="Where it goes in the Outliner", items=after_enum, update=apply_new),
+    "name_first_place": lambda: bpy.props.EnumProperty(
+        name="Inside", items=place_enum, update=place_clicked),
+    "name_first_step": lambda: bpy.props.EnumProperty(
+        name="Move", items=STEPS, default='NONE', update=step_clicked),
+    "name_first_cancel": lambda: bpy.props.BoolProperty(
+        name="Cancel", description="Remove the new collection and put the object back", update=cancel_clicked),
 }
 
 

@@ -44,20 +44,25 @@ Forgot which collection was active? Turn on **Also ask for the collection** in t
 extension's preferences (*Edit → Preferences → Add-ons → Name First*). The popup then gets
 two more lines:
 
-- **The collection list**, starting on the one the object landed in. Pick another and the
-  object moves there.
+- **The collection list**, starting on the Outliner's active collection, where Blender puts
+  new objects. Pick another and the object moves there.
 - **New collection**. Press <kbd>Tab</kbd> from the name to jump to it, type a name, press
   <kbd>Enter</kbd>: the collection exists and the object is in it. It goes inside the
   collection shown in the list, at the bottom, like Blender's own *New Collection*.
 
-  Then, only if you want: click a **color**, pick the collection it goes **inside**, and
-  **where** it goes, after any collection or object, since Blender 5.3 lets the Outliner mix
-  them in any order. Every change shows in the Outliner right away. **×** undoes it all.
+  Then, only if you want, a **small Outliner** appears with your new collection highlighted:
+
+  - **Click any collection** to put the new one inside it.
+  - **▲ ▼** move it up and down, **◀** takes it out of its parent, **▶** puts it inside the
+    collection above.
+  - Click a **color**, or **×** to undo it all.
+
+  Every change shows in the real Outliner right away.
 
 So the whole thing can be keyboard only: <kbd>Shift</kbd> <kbd>A</kbd> → `Chair`
 <kbd>Tab</kbd> `Furniture` <kbd>Enter</kbd>.
 
-<img src="assets/preview-collection.png" width="600" alt="The popup with the name Vase, a new red collection Decor placed after Lights, and the Outliner showing Decor right after Lights">
+<img src="assets/preview-collection.png" width="390" alt="The popup with the name Vase, a new red collection Decor highlighted inside Props after Furniture in a small Outliner, with arrow buttons next to it">
 
 ### The "Adjust Last Operation" panel keeps working
 
@@ -94,7 +99,7 @@ repository, so you still get updates.
 
 ### Offline
 
-Download **`name_first-1.2.0.zip`** from the [latest release](../../releases/latest) and drag
+Download **`name_first-1.3.0.zip`** from the [latest release](../../releases/latest) and drag
 it into Blender (or *Get Extensions → ⌄ → Install from Disk*). You won't get updates this way.
 
 **To turn it off:** disable or uninstall the extension.
@@ -108,7 +113,7 @@ The whole extension is [one small file](extension/name_first/__init__.py):
 | Notice a new object | After each update, the last operator is an `…_add` and the object count went up |
 | Ask for its name | Opens a popup panel, the same one <kbd>F2</kbd> shows, under the mouse |
 | Rename without closing *Adjust Last Operation* | The text field lives on the window manager, which isn't part of undo, so typing in it doesn't end the operation the way <kbd>F2</kbd> does |
-| Move it, or make a collection | Same trick: the list and the new-collection fields live on the window manager, and the work is done from code |
+| Move it, or make a collection | Same trick: the list, the fields and even the small Outliner's rows and arrows are window-manager properties, never operator buttons (running an operator from the popup would close *Adjust Last Operation*) |
 | Keep undo safe | Every change is saved as its own undo step, which Blender allows without closing *Adjust Last Operation* |
 | Place a collection anywhere | Blender 5.3's Outliner order (`sort_index`), shared by collections and objects; older versions only reorder collections |
 | Keep everything after a redo | Changing the vertices re-creates the object as `Cylinder`; it gets its name back, and its collection (made again if needed) |
