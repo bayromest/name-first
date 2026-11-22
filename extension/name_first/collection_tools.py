@@ -5,20 +5,12 @@
 """Collections: listing them, moving an object, creating and placing one."""
 
 from contextlib import contextmanager
-from zlib import crc32
 
 import bpy
 
 SCENE_COLLECTION = "__scene__"
 FIRST = "__first__"
 COLORS = ['NONE'] + ['COLOR_%02d' % n for n in range(1, 9)]
-
-
-def number(identifier):
-    """A fixed number per item: Blender stores a dropdown's choice as a number,
-    so it must not change when the list around it does."""
-    # Under 2**24: a clickable enum item keeps its number as a 32-bit float.
-    return crc32(identifier.encode()) & 0xFFFFFF
 
 
 def icon(collection):
@@ -35,27 +27,6 @@ def from_id(scene, identifier):
 
 def id_of(scene, collection):
     return SCENE_COLLECTION if collection in (None, scene.collection) else collection.name
-
-
-def tree_items(scene, skip=None):
-    """Enum items for every collection in the scene, indented like the Outliner.
-    `skip` leaves out a collection and everything inside it."""
-    items = [(SCENE_COLLECTION, "Scene Collection", "", 'SCENE_DATA', number(SCENE_COLLECTION))]
-    used = {items[0][4]}
-
-    def walk(parent, depth):
-        for child in parent.children:
-            if child.name == skip:
-                continue
-            value = number(child.name)
-            while value in used:  # two names with the same number: rare
-                value = (value + 1) & 0xFFFFFF
-            used.add(value)
-            items.append((child.name, "    " * depth + child.name, "", icon(child), value))
-            walk(child, depth + 1)
-
-    walk(scene.collection, 0)
-    return items
 
 
 # Blender 5.3+ keeps a custom Outliner order (sort_index) where collections and
@@ -127,6 +98,20 @@ def keep_view_layers():
             restore(view_layer.layer_collection, key, view_layer)
 
 
+def order(parent, mine, after):
+    """Blender 5.3+: put the item `mine` right after `after` (or FIRST) among
+    what's inside `parent`, by renumbering the Outliner order."""
+    items = siblings(parent)
+    entry = next(item[3] for item in items if item[0] == mine)
+    rest = [item for item in items if item[0] != mine]
+    index = 0 if after == FIRST else next((i + 1 for i, item in enumerate(rest) if item[0] == after), len(rest))
+    entries = [item[3] for item in rest]
+    entries.insert(index, entry)
+    for number, each in enumerate(entries):
+        if each.sort_index != number:
+            each.sort_index = number
+
+
 def place(scene, collection, parent, after):
     """Put `collection` inside `parent`, right after the sibling `after`
     (an identifier from siblings), or first."""
@@ -136,20 +121,14 @@ def place(scene, collection, parent, after):
     if collection.name not in parent.children:
         parent.children.link(collection)
 
-    rest = siblings(parent, skip=collection.name)
-    index = 0 if after == FIRST else next((i + 1 for i, item in enumerate(rest) if item[0] == after), len(rest))
-
     if CUSTOM_ORDER:
-        mine = next(e for c, e in zip(parent.children, parent.collection_children) if c == collection)
-        order = [item[3] for item in rest]
-        order.insert(index, mine)
-        for number, entry in enumerate(order):
-            if entry.sort_index != number:
-                entry.sort_index = number
+        order(parent, "C:" + collection.name, after)
         return
 
     # Older Blender: a collection's place is its link order, so relink the
     # ones that must come after it.
+    rest = siblings(parent, skip=collection.name)
+    index = 0 if after == FIRST else next((i + 1 for i, item in enumerate(rest) if item[0] == after), len(rest))
     later = [bpy.data.collections[item[1]] for item in rest[index:]]
     if not later:
         return
@@ -160,6 +139,25 @@ def place(scene, collection, parent, after):
             parent.children.link(child)
 
 
+def place_object(obj, source, parent, after):
+    """Move `obj` from `source` into `parent`, right after `after` (5.3+;
+    before that, objects are always sorted by name)."""
+    if obj.name not in parent.objects:
+        parent.objects.link(obj)
+    if source is not None and source != parent and obj.name in source.objects:
+        source.objects.unlink(obj)
+    if CUSTOM_ORDER:
+        order(parent, "O:" + obj.name, after)
+
+
+def contents(parent):
+    """What the Outliner shows inside `parent`, in its order: (identifier, name)."""
+    if CUSTOM_ORDER:
+        return [(item[0], item[1]) for item in siblings(parent)]
+    return ([("C:" + c.name, c.name) for c in parent.children]
+            + [("O:" + o.name, o.name) for o in sorted(parent.objects, key=lambda o: o.name)])
+
+
 def parent_of(scene, collection):
     for parent in [scene.collection, *bpy.data.collections]:
         if collection.name in parent.children:
@@ -167,69 +165,34 @@ def parent_of(scene, collection):
     return scene.collection
 
 
-def where(scene, collection):
-    """(parent, the sibling right before it, or FIRST): enough to put it back."""
-    parent = parent_of(scene, collection)
-    ids = [item[0] for item in siblings(parent)]
-    index = ids.index("C:" + collection.name)
-    return parent, ids[index - 1] if index else FIRST
+def ancestors(scene, collection):
+    """The collections above `collection`, up to the scene's."""
+    found = []
+    while collection is not None and collection != scene.collection:
+        collection = parent_of(scene, collection)
+        found.append(collection)
+    return found
 
 
-def tree(scene):
-    """Every collection in Outliner order: (collection, depth)."""
-    rows = []
-
-    def walk(parent, depth):
-        for identifier, *_ in siblings(parent):
-            if identifier.startswith("C:"):
-                child = parent.children[identifier[2:]]
-                rows.append((child, depth))
-                walk(child, depth + 1)
-
-    walk(scene.collection, 0)
-    return rows
-
-
-def moves(scene, collection):
-    """The moves that do something right now: {'UP': bool, ...}."""
-    parent = parent_of(scene, collection)
-    nested = parent != scene.collection
-    ids = [item[0] for item in siblings(parent) if item[0].startswith("C:")]
-    index = ids.index("C:" + collection.name)
-    return {'UP': index > 0 or nested, 'DOWN': index < len(ids) - 1 or nested,
-            'OUT': nested, 'IN': index > 0}
-
-
-def move(scene, collection, action, target=""):
-    """Move a collection one step, like dragging it in the Outliner:
-    UP / DOWN past its neighbour (out of its parent at the ends), OUT of its
-    parent, IN the collection above it, or INTO `target`, at the bottom."""
-    if action == 'INTO':
-        parent = from_id(scene, target) or scene.collection
-        place(scene, collection, parent, last_position(parent, skip=collection.name))
-        return
-    parent = parent_of(scene, collection)
-    mine = "C:" + collection.name
-    everything = [item[0] for item in siblings(parent)]
-    others = [i for i in everything if i != mine]
-    colls = [i for i in everything if i.startswith("C:")]
-    index = colls.index(mine)
-    grand = parent_of(scene, parent) if parent != scene.collection else None
-
-    if action == 'UP' and index > 0:
-        above = others.index(colls[index - 1])
-        place(scene, collection, parent, others[above - 1] if above else FIRST)
-    elif action == 'DOWN' and index < len(colls) - 1:
-        place(scene, collection, parent, colls[index + 1])
-    elif action == 'IN' and index > 0:
-        new_parent = parent.children[colls[index - 1][2:]]
-        place(scene, collection, new_parent, last_position(new_parent, skip=collection.name))
-    elif action == 'UP' and grand is not None:  # first: go just above the parent
-        around = [item[0] for item in siblings(grand)]
-        at = around.index("C:" + parent.name)
-        place(scene, collection, grand, around[at - 1] if at else FIRST)
-    elif action in ('DOWN', 'OUT') and grand is not None:  # just below the parent
-        place(scene, collection, grand, "C:" + parent.name)
+def drop(scene, items, parent, after=None):
+    """Move dragged items, keeping their order, into `parent` right after
+    `after` (None: at the bottom). `items`: (kind 'C' or 'O', name, source id)."""
+    dragged = {kind + ":" + name for kind, name, _ in items}
+    if after is None:
+        rest = [item[0] for item in siblings(parent) if item[0] not in dragged]
+        after = rest[-1] if rest else FIRST
+    for kind, name, source in items:
+        if kind == 'C':
+            collection = bpy.data.collections.get(name)
+            if collection is None or collection == parent or collection in ancestors(scene, parent):
+                continue  # gone, or it would go inside itself
+            place(scene, collection, parent, after)
+        else:
+            obj = bpy.data.objects.get(name)
+            if obj is None:
+                continue
+            place_object(obj, from_id(scene, source), parent, after)
+        after = kind + ":" + name
 
 
 def create(scene, name, color, parent, after):

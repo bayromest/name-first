@@ -38,38 +38,35 @@ lights, cameras, empties, armatures, grease pencil, force fields, and primitives
 add-ons. It stays quiet for things that aren't new objects (adding a modifier, a material
 slot, a primitive inside Edit Mode) and for scripts.
 
-### Optional: pick the collection, or make a new one
+### Optional: a small Outliner to put it where it goes
 
-Forgot which collection was active? Turn on **Also ask for the collection** in the
-extension's preferences (*Edit → Preferences → Add-ons → Name First*). The popup then gets
-two more lines:
+Turn on **Also place it in the Outliner** in the extension's preferences
+(*Edit → Preferences → Add-ons → Name First*). A small Outliner then opens next to the
+name, in your theme's colors, with the new object highlighted. It works like the real one:
 
-- **The collection list**, starting on the Outliner's active collection, where Blender puts
-  new objects. Pick another and the object moves there.
-- **New collection**. Press <kbd>Tab</kbd> from the name to jump to it, type a name, press
-  <kbd>Enter</kbd>: the collection exists and the object is in it. It goes inside the
-  collection shown in the list, at the bottom, like Blender's own *New Collection*.
+- **Drag** anything, the new object or any other object or collection, above, below or
+  into a collection. A line or a box shows where it will land.
+- **Ctrl** click to pick several, **Shift** click for a range, then drag them all.
+- Click the **arrows** to open and close collections. Hover a closed one while dragging and
+  it opens.
+- Click a **color** at the top to tag the selected collections.
 
-  Then, only if you want, a **small Outliner** appears with your new collection highlighted:
-
-  - **Click any collection** to put the new one inside it.
-  - **▲ ▼** move it up and down, **◀** takes it out of its parent, **▶** puts it inside the
-    collection above.
-  - Click a **color**, or **×** to undo it all.
-
-  Every change shows in the real Outliner right away.
+The popup gets one more field, **New collection**: press <kbd>Tab</kbd> from the name, type,
+press <kbd>Enter</kbd>. The collection is made where the object is, the object goes in it,
+and it's highlighted in the small Outliner, ready to drag.
 
 So the whole thing can be keyboard only: <kbd>Shift</kbd> <kbd>A</kbd> → `Chair`
-<kbd>Tab</kbd> `Furniture` <kbd>Enter</kbd>.
+<kbd>Tab</kbd> `Furniture` <kbd>Enter</kbd>. The small Outliner closes on <kbd>Esc</kbd>, or as
+soon as you do something else. Each drag is its own undo step.
 
-<img src="assets/preview-collection.png" width="390" alt="The popup with the name Vase, a new red collection Decor highlighted inside Props after Furniture in a small Outliner, with arrow buttons next to it">
+<img src="assets/preview-collection.png" width="560" alt="The name popup with Vase, and next to it a small Outliner where the new red collection Decor, holding Vase, is being dragged below Lights">
 
 ### The "Adjust Last Operation" panel keeps working
 
 Renaming with Blender's own <kbd>F2</kbd> closes the *Adjust Last Operation* panel, so you
 can no longer change the cylinder's vertices or the cube's size. `name-first` doesn't: the
 panel stays open, and if you change the vertices afterwards, the object keeps the name you
-typed (and the collection you picked or made).
+typed, and everything you did in the small Outliner is done again.
 
 You might think of pressing <kbd>F9</kbd> to bring the panel back after <kbd>F2</kbd>: it
 doesn't work, because renaming with <kbd>F2</kbd> makes Blender forget the last operation
@@ -99,24 +96,25 @@ repository, so you still get updates.
 
 ### Offline
 
-Download **`name_first-1.3.0.zip`** from the [latest release](../../releases/latest) and drag
+Download **`name_first-1.4.0.zip`** from the [latest release](../../releases/latest) and drag
 it into Blender (or *Get Extensions → ⌄ → Install from Disk*). You won't get updates this way.
 
 **To turn it off:** disable or uninstall the extension.
 
 ## How it works
 
-The whole extension is [one small file](extension/name_first/__init__.py):
+The extension is [one small file](extension/name_first/__init__.py), plus the small Outliner
+([`outliner.py`](extension/name_first/outliner.py)) and collection helpers:
 
 | Step | How |
 | --- | --- |
 | Notice a new object | After each update, the last operator is an `…_add` and the object count went up |
 | Ask for its name | Opens a popup panel, the same one <kbd>F2</kbd> shows, under the mouse |
 | Rename without closing *Adjust Last Operation* | The text field lives on the window manager, which isn't part of undo, so typing in it doesn't end the operation the way <kbd>F2</kbd> does |
-| Move it, or make a collection | Same trick: the list, the fields and even the small Outliner's rows and arrows are window-manager properties, never operator buttons (running an operator from the popup would close *Adjust Last Operation*) |
+| A small Outliner that doesn't close it | Blender's real Outliner closes *Adjust Last Operation* on every drag, and add-ons can't make rows draggable in a popup, so it's drawn by hand (`gpu`, `blf`) by an operator that only reads the mouse over it |
 | Keep undo safe | Every change is saved as its own undo step, which Blender allows without closing *Adjust Last Operation* |
 | Place a collection anywhere | Blender 5.3's Outliner order (`sort_index`), shared by collections and objects; older versions only reorder collections |
-| Keep everything after a redo | Changing the vertices re-creates the object as `Cylinder`; it gets its name back, and its collection (made again if needed) |
+| Keep everything after a redo | Changing the vertices re-creates the object as `Cylinder`; it gets its name back, its new collection, and every drag and color is done again |
 
 Nothing runs in the background and no keymaps change.
 
@@ -128,8 +126,8 @@ Yes, nothing about <kbd>F2</kbd> changes.
 **Does it ask when I duplicate (<kbd>Shift</kbd> <kbd>D</kbd>) or import a file?**
 No, only for the *Add* menu. A duplicate is usually "the same thing again".
 
-**Can it also ask which collection the object goes in, or make a new one?**
-Yes, turn on *Also ask for the collection* in the preferences. It's off by default, so the
+**Can it also place the object in a collection, or make a new one?**
+Yes, turn on *Also place it in the Outliner* in the preferences. It's off by default, so the
 popup stays a one-field, <kbd>Enter</kbd>-and-done thing.
 
 **Something else opens a popup when I add objects.**
